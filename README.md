@@ -16,7 +16,7 @@ API RESTful que conecta nuestra aplicación web con el motor de recomendaciones 
 
 1. **Clonar el repositorio:**
    ```bash
-   git clone [https://github.com/TU-USUARIO/nodeflix-backend.git](https://github.com/TU-USUARIO/nodeflix-backend.git)
+   git clone https://github.com/stepaz-2022164/nodeflix-back.git
    cd nodeflix-backend
 
 
