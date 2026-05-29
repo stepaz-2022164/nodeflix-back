@@ -1,20 +1,24 @@
 import express from 'express';
 import cors from 'cors';
-import 'dotenv/config'; // Esto carga automáticamente las variables de tu archivo .env
+import 'dotenv/config';
 import seriesRoutes from './routes/series.routes.ts';
 import { conectarDB } from './config/neo4j.ts';
 import userRoutes from './routes/users.routes.ts';
+import interactionRoutes from './routes/interaction.routes.ts';
+import recommendationRoutes from './routes/recommendation.routes.ts';
 
 const app = express();
 const PORT = process.env.PORT || 3000;
 
 // Middlewares
-app.use(cors()); // Permite peticiones desde otros puertos (como el 4200 de Angular)
-app.use(express.json()); // Permite que tu backend entienda JSON
+app.use(cors());
+app.use(express.json());
 
 // Rutas
 app.use('/api/series', seriesRoutes);
 app.use('/api/user', userRoutes);
+app.use('/api/interacciones', interactionRoutes);
+app.use('/api/recomendaciones', recommendationRoutes);
 
 // Iniciar servidor
 app.listen(PORT, () => {
@@ -22,3 +26,10 @@ app.listen(PORT, () => {
     console.log(`✅ Rutas de series activas en http://localhost:${PORT}/api/series`);
     conectarDB();
 });
+
+// Cors
+app.use(cors({
+    origin: 'http://localhost:4200',
+    methods: ['GET', 'POST', 'PUT', 'DELETE'],
+    allowedHeaders: ['Content-Type', 'Authorization'] 
+}));

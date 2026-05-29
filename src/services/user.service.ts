@@ -1,6 +1,7 @@
 import { driver, DATABASE_NAME } from '../config/neo4j.ts';
 import bcrypt from 'bcrypt';
-import crypto from 'crypto'; // Viene nativo en Node.js, para generar IDs únicos
+import crypto from 'crypto';
+import jwt from 'jsonwebtoken';
 
 export const registrarUsuario = async (datos: any) => {
     const { nombre, correo, password, rol = 'Tester' } = datos;
@@ -62,16 +63,27 @@ export const loginUsuario = async (correo: string, passwordPlano: string) => {
         // 2. Comparar la contraseña escrita con el Hash guardado
         const esCorrecta = await bcrypt.compare(passwordPlano, nodoUsuario.password_hash);
         
-        if (!esCorrecta) {
+       if (!esCorrecta) {
             throw new Error('Correo o contraseña incorrectos.');
         }
 
-        // 3. Devolver los datos (NUNCA devolver el hash al frontend)
+        // ¡NUEVO!: Generamos el token VIP válido por 24 horas
+        const firma = process.env.JWT_SECRET || 'secreto_por_defecto';
+        const token = jwt.sign(
+            { id: nodoUsuario.id, correo: nodoUsuario.correo }, 
+            firma, 
+            { expiresIn: '24h' }
+        );
+
+        // Devolvemos los datos del usuario Y el token
         return {
-            id: nodoUsuario.id,
-            nombre: nodoUsuario.nombre,
-            correo: nodoUsuario.correo,
-            rol: nodoUsuario.rol
+            usuario: {
+                id: nodoUsuario.id,
+                nombre: nodoUsuario.nombre,
+                correo: nodoUsuario.correo,
+                rol: nodoUsuario.rol
+            },
+            token: token
         };
     } finally {
         await session.close();
