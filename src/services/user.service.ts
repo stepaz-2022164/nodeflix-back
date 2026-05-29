@@ -48,7 +48,7 @@ export const registrarUsuario = async (datos: any) => {
 };
 
 export const loginUsuario = async (correo: string, passwordPlano: string) => {
-    const session = driver.session();
+    const session = driver.session({ database: DATABASE_NAME });
     try {
         // 1. Buscar al usuario por correo
         const query = `MATCH (u:Usuario {correo: $correo}) RETURN u`;
@@ -67,7 +67,6 @@ export const loginUsuario = async (correo: string, passwordPlano: string) => {
             throw new Error('Correo o contraseña incorrectos.');
         }
 
-        // ¡NUEVO!: Generamos el token VIP válido por 24 horas
         const firma = process.env.JWT_SECRET || 'secreto_por_defecto';
         const token = jwt.sign(
             { id: nodoUsuario.id, correo: nodoUsuario.correo }, 

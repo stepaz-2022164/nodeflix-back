@@ -1,12 +1,13 @@
 import { type Request, type Response } from 'express';
 import { obtenerRecomendaciones } from '../services/recommendation.service.ts';
+import { type AuthRequest } from '../middlewares/auth.middleware.ts';
 
-export const getRecomendaciones = async (req: Request, res: Response): Promise<void> => {
+export const getRecomendaciones = async (req: AuthRequest, res: Response): Promise<void> => {
     try {
-        const idUsuario = req.params.idUsuario;
+        const idUsuario = (req.usuario as any).id;
 
         if (!idUsuario) {
-            res.status(400).json({ success: false, message: 'Se requiere el ID del usuario.' });
+            res.status(401).json({ success: false, message: 'Usuario no autenticado o token inválido.' });
             return;
         }
 

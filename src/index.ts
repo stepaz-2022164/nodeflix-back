@@ -11,7 +11,11 @@ const app = express();
 const PORT = process.env.PORT || 3000;
 
 // Middlewares
-app.use(cors());
+app.use(cors({
+    origin: 'http://localhost:4200',
+    methods: ['GET', 'POST', 'PUT', 'DELETE'],
+    allowedHeaders: ['Content-Type', 'Authorization'] 
+}));
 app.use(express.json());
 
 // Rutas
@@ -27,9 +31,3 @@ app.listen(PORT, () => {
     conectarDB();
 });
 
-// Cors
-app.use(cors({
-    origin: 'http://localhost:4200',
-    methods: ['GET', 'POST', 'PUT', 'DELETE'],
-    allowedHeaders: ['Content-Type', 'Authorization'] 
-}));

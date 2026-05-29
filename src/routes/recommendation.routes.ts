@@ -5,6 +5,6 @@ import { verificarToken } from '../middlewares/auth.middleware.ts';
 const router = Router();
 
 // GET /api/recomendaciones/:idUsuario
-router.get('/:idUsuario', verificarToken, getRecomendaciones);
+router.get('/', verificarToken, getRecomendaciones);
 
 export default router;

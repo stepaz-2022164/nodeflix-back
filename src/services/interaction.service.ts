@@ -2,7 +2,6 @@ import { driver, DATABASE_NAME } from '../config/neo4j.ts';
 import { obtenerDetallesSerie } from './tmdb.service.ts';
 
 export const registrarInteraccion = async (idUsuario: string, idTmdb: number, tipoInteraccion: string) => {
-    // 1. Seguridad: Validar el tipo de interacción para evitar inyección de código en Cypher
     const interaccionesValidas = ['LE_GUSTA', 'ES_FAVORITA', 'QUIERE_VER', 'NO_LE_GUSTA'];
     if (!interaccionesValidas.includes(tipoInteraccion)) {
         throw new Error('Tipo de interacción no válido.');
@@ -11,18 +10,14 @@ export const registrarInteraccion = async (idUsuario: string, idTmdb: number, ti
     const session = driver.session({ database: DATABASE_NAME });
     
     try {
-        // 2. Verificamos si la serie ya existe en nuestro grafo
         const checkQuery = `MATCH (s:Serie {id_tmdb: $idTmdb}) RETURN s`;
         const checkResult = await session.run(checkQuery, { idTmdb });
 
-        // 3. ¡LA MAGIA DEL LAZY LOADING!
         if (checkResult.records.length === 0) {
-            console.log(`⏳ Serie ${idTmdb} no existe en Neo4j. Importando desde TMDB...`);
-            
-            // Llamamos al servicio de la Fase 3
+            console.log(`Serie ${idTmdb} no existe en Neo4j. Importando desde TMDB...`);
+
             const detalles = await obtenerDetallesSerie(idTmdb);
 
-            // Guardamos la serie, iteramos sobre sus géneros (UNWIND) y creamos las relaciones
             const createSeriesQuery = `
                 MERGE (s:Serie {id_tmdb: $idTmdb})
                 ON CREATE SET 
@@ -43,14 +38,21 @@ export const registrarInteraccion = async (idUsuario: string, idTmdb: number, ti
                 youtube_key: detalles.youtube_key || '',
                 generos: detalles.generos
             });
-            console.log(`✅ Serie "${detalles.titulo}" importada correctamente.`);
+            console.log(`Serie "${detalles.titulo}" importada correctamente.`);
         }
 
-        // 4. Finalmente, creamos la interacción del usuario
-        // Nota: El tipo de relación no se puede parametrizar con $, por eso lo concatenamos de forma segura
         const interactQuery = `
             MATCH (u:Usuario {id: $idUsuario})
             MATCH (s:Serie {id_tmdb: $idTmdb})
+            
+            // Borrar cualquier relación anterior de interés hacia esta serie
+            OPTIONAL MATCH (u)-[rAntigua:LE_GUSTA|ES_FAVORITA|QUIERE_VER|NO_LE_GUSTA]->(s)
+            DELETE rAntigua
+            
+            // Pasar las variables a la siguiente etapa
+            WITH u, s
+            
+            // Crear la nueva relación dinámicamente
             MERGE (u)-[r:${tipoInteraccion}]->(s)
             RETURN u.nombre AS usuario, type(r) AS accion, s.titulo AS serie
         `;
@@ -62,6 +64,28 @@ export const registrarInteraccion = async (idUsuario: string, idTmdb: number, ti
         }
 
         return result.records[0].toObject();
+    } finally {
+        await session.close();
+    }
+};
+
+export const obtenerInteraccionesUsuario = async (idUsuario: string) => {
+    const session = driver.session({ database: DATABASE_NAME });
+    
+    try {
+        const query = `
+            MATCH (u:Usuario {id: $idUsuario})-[r]->(s:Serie)
+            WHERE type(r) IN ['LE_GUSTA', 'ES_FAVORITA', 'QUIERE_VER', 'NO_LE_GUSTA']
+            RETURN s.id_tmdb AS id_tmdb, s.titulo AS titulo, type(r) AS interaccion
+        `;
+        
+        const resultado = await session.run(query, { idUsuario });
+        
+        return resultado.records.map(record => ({
+            id_tmdb: record.get('id_tmdb').toNumber(),
+            titulo: record.get('titulo'),
+            interaccion: record.get('interaccion')
+        }));
     } finally {
         await session.close();
     }
