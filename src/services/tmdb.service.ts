@@ -27,7 +27,6 @@ export const obtenerSeriesPopulares = async (pagina: number = 1) => {
     
     const datos = await respuesta.json();
     
-    // Mapeamos para devolver solo lo que Angular necesita
     return datos.results.map((serie: any) => ({
         id_tmdb: serie.id,
         titulo: serie.name,
@@ -40,8 +39,6 @@ export const obtenerSeriesPopulares = async (pagina: number = 1) => {
 // 2. BUSCAR SERIES POR NOMBRE (Para la barra de búsqueda)
 // ---------------------------------------------------------
 export const buscarSeries = async (query: string, pagina: number = 1) => {
-    // encodeURIComponent asegura que si el usuario busca "Breaking Bad", 
-    // el espacio se convierta en "%20" para que la URL no se rompa.
     const querySeguro = encodeURIComponent(query);
     const url = armarUrl('/search/tv', `&query=${querySeguro}&page=${pagina}`);
     
@@ -75,16 +72,13 @@ export const obtenerDetallesSerie = async (idTmdb: number) => {
 
     const detalles = await resDetalles.json();
     let videos = { results: [] as any[] };
-    
-    // Si la petición de videos falla, no rompemos todo, simplemente asumimos que no hay videos
+
     if (resVideos.ok) {
         videos = await resVideos.json();
     }
 
-    // Buscamos específicamente el primer video que sea de tipo "Trailer" en YouTube
     const trailer = videos.results.find((vid: any) => vid.site === 'YouTube' && vid.type === 'Trailer');
 
-    // Retornamos el objeto consolidado listo para ser insertado en Neo4j mediante Cypher
     return {
         id_tmdb: detalles.id,
         titulo: detalles.name,

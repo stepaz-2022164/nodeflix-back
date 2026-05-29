@@ -5,18 +5,13 @@ import jwt from 'jsonwebtoken';
 
 export const registrarUsuario = async (datos: any) => {
     const { nombre, correo, password, rol = 'Tester' } = datos;
-
-    // 1. Encriptar la contraseña
     const saltRounds = 10;
     const passwordHash = await bcrypt.hash(password, saltRounds);
     
-    // 2. Generar un ID único
     const idUnico = crypto.randomUUID();
 
     const session = driver.session({ database: DATABASE_NAME });
     try {
-        // 3. Usamos CREATE en lugar de MERGE. 
-        // Si el correo ya existe, la restricción de Neo4j bloqueará esto automáticamente.
         const query = `
             CREATE (u:Usuario {
                 id: $id,
@@ -36,11 +31,9 @@ export const registrarUsuario = async (datos: any) => {
         return resultado.records[0].toObject();
 
     } catch (error: any) {
-        // 4. Capturamos específicamente el error de duplicidad de Neo4j
         if (error.code === 'Neo.ClientError.Schema.ConstraintValidationFailed') {
             throw new Error('El correo ya está registrado. Intenta iniciar sesión.');
         }
-        // Si es otro tipo de error (como caída de red), lo lanzamos normal
         throw error;
     } finally {
         await session.close();
@@ -50,7 +43,6 @@ export const registrarUsuario = async (datos: any) => {
 export const loginUsuario = async (correo: string, passwordPlano: string) => {
     const session = driver.session({ database: DATABASE_NAME });
     try {
-        // 1. Buscar al usuario por correo
         const query = `MATCH (u:Usuario {correo: $correo}) RETURN u`;
         const resultado = await session.run(query, { correo });
 
@@ -59,8 +51,6 @@ export const loginUsuario = async (correo: string, passwordPlano: string) => {
         }
 
         const nodoUsuario = resultado.records[0].get('u').properties;
-
-        // 2. Comparar la contraseña escrita con el Hash guardado
         const esCorrecta = await bcrypt.compare(passwordPlano, nodoUsuario.password_hash);
         
        if (!esCorrecta) {
@@ -74,7 +64,6 @@ export const loginUsuario = async (correo: string, passwordPlano: string) => {
             { expiresIn: '24h' }
         );
 
-        // Devolvemos los datos del usuario Y el token
         return {
             usuario: {
                 id: nodoUsuario.id,
