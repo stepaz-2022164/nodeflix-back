@@ -60,30 +60,37 @@ export const buscarSeries = async (query: string, pagina: number = 1) => {
 // ---------------------------------------------------------
 export const obtenerDetallesSerie = async (idTmdb: number) => {
     const urlDetalles = armarUrl(`/tv/${idTmdb}`);
-    
-    // 🌟 EL TRUCO ESTÁ AQUÍ: Agregamos include_video_language para tener un "fallback" de idiomas
     const urlVideos = armarUrl(`/tv/${idTmdb}/videos`, '&include_video_language=es-MX,es,en');
+    
+    const urlProveedores = armarUrl(`/tv/${idTmdb}/watch/providers`);
 
-    const [resDetalles, resVideos] = await Promise.all([
+    const [resDetalles, resVideos, resProveedores] = await Promise.all([
         fetch(urlDetalles),
-        fetch(urlVideos)
+        fetch(urlVideos),
+        fetch(urlProveedores)
     ]);
 
     if (!resDetalles.ok) throw new Error(`Error al obtener detalles de la serie ${idTmdb}`);
 
     const detalles = await resDetalles.json();
     let videos = { results: [] as any[] };
+    let proveedores = { results: {} as any };
 
-    if (resVideos.ok) {
-        videos = await resVideos.json();
-    }
+    if (resVideos.ok) videos = await resVideos.json();
+    if (resProveedores.ok) proveedores = await resProveedores.json();
 
     const videosYT = videos.results.filter((vid: any) => vid.site === 'YouTube');
-    
     const videoSeleccionado = videosYT.find((vid: any) => vid.type === 'Trailer')
-                           || videosYT.find((vid: any) => vid.type === 'Teaser')
-                           || videosYT.find((vid: any) => vid.type === 'Clip')
-                           || videosYT[0];
+                        || videosYT.find((vid: any) => vid.type === 'Teaser')
+                        || videosYT.find((vid: any) => vid.type === 'Clip')
+                        || videosYT[0];
+
+    const plataformasGT = proveedores.results?.['GT']?.flatrate || [];
+    
+    const plataformas = plataformasGT.map((p: any) => ({
+        nombre: p.provider_name,
+        logo: `https://image.tmdb.org/t/p/original${p.logo_path}`
+    }));
 
     return {
         id_tmdb: detalles.id,
@@ -93,6 +100,7 @@ export const obtenerDetallesSerie = async (idTmdb: number) => {
         fecha_salida: detalles.first_air_date,
         poster: detalles.poster_path ? `https://image.tmdb.org/t/p/w500${detalles.poster_path}` : null,
         youtube_key: videoSeleccionado ? videoSeleccionado.key : null,
-        generos: detalles.genres 
+        generos: detalles.genres,
+        plataformas: plataformas 
     };
 };
