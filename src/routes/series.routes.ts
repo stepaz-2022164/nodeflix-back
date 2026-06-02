@@ -3,9 +3,6 @@ import { getPopulares, searchSeries, getDetalles } from '../controllers/series.c
 
 const router = Router();
 
-// IMPORTANTE: El orden importa en Express. 
-// Las rutas fijas (/populares, /buscar) deben ir ANTES que las rutas con parámetros dinámicos (/:id)
-
 // GET /api/series/populares
 router.get('/populares', getPopulares);
 

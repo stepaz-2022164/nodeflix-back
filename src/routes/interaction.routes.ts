@@ -7,7 +7,7 @@ const router = Router();
 // POST /api/interacciones
 router.post('/', verificarToken, interactuar);
 
-// GET /api/interacciones/:idUsuario (Leer historial para el Frontend)
+// GET /api/interacciones 
 router.get('/', verificarToken, getInteraccionesUsuario);
 
 export default router;

@@ -7,10 +7,8 @@ const PASS = process.env.NEO4J_PASSWORD || 'admin123';
 
 export const DATABASE_NAME = process.env.NEO4J_DATABASE || 'neo4j';
 
-// Creamos una única instancia del driver para toda la aplicación
 export const driver = neo4j.driver(URI, neo4j.auth.basic(USER, PASS));
 
-// Función para probar la conexión al iniciar el servidor
 export const conectarDB = async () => {
     try {
         await driver.verifyConnectivity();

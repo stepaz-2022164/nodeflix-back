@@ -59,9 +59,10 @@ export const buscarSeries = async (query: string, pagina: number = 1) => {
 // 3. OBTENER DETALLES Y TRÁILER (Para Lazy Loading y Neo4j)
 // ---------------------------------------------------------
 export const obtenerDetallesSerie = async (idTmdb: number) => {
-    // Hacemos DOS peticiones simultáneas usando Promise.all para que sea más rápido
     const urlDetalles = armarUrl(`/tv/${idTmdb}`);
-    const urlVideos = armarUrl(`/tv/${idTmdb}/videos`);
+    
+    // 🌟 EL TRUCO ESTÁ AQUÍ: Agregamos include_video_language para tener un "fallback" de idiomas
+    const urlVideos = armarUrl(`/tv/${idTmdb}/videos`, '&include_video_language=es-MX,es,en');
 
     const [resDetalles, resVideos] = await Promise.all([
         fetch(urlDetalles),
@@ -77,7 +78,12 @@ export const obtenerDetallesSerie = async (idTmdb: number) => {
         videos = await resVideos.json();
     }
 
-    const trailer = videos.results.find((vid: any) => vid.site === 'YouTube' && vid.type === 'Trailer');
+    const videosYT = videos.results.filter((vid: any) => vid.site === 'YouTube');
+    
+    const videoSeleccionado = videosYT.find((vid: any) => vid.type === 'Trailer')
+                           || videosYT.find((vid: any) => vid.type === 'Teaser')
+                           || videosYT.find((vid: any) => vid.type === 'Clip')
+                           || videosYT[0];
 
     return {
         id_tmdb: detalles.id,
@@ -86,7 +92,7 @@ export const obtenerDetallesSerie = async (idTmdb: number) => {
         calificacion: detalles.vote_average,
         fecha_salida: detalles.first_air_date,
         poster: detalles.poster_path ? `https://image.tmdb.org/t/p/w500${detalles.poster_path}` : null,
-        youtube_key: trailer ? trailer.key : null,
-        generos: detalles.genres // Viene como un arreglo: [{ id: 18, name: 'Drama' }, ...]
+        youtube_key: videoSeleccionado ? videoSeleccionado.key : null,
+        generos: detalles.genres 
     };
 };

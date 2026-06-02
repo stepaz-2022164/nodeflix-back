@@ -3,7 +3,6 @@ import { registrarUsuario, loginUsuario } from '../services/user.service.ts';
 
 export const registro = async (req: Request, res: Response): Promise<void> => {
     try {
-        // Verificamos que envíen lo necesario
         if (!req.body.correo || !req.body.password || !req.body.nombre) {
             res.status(400).json({ success: false, message: 'Faltan campos obligatorios' });
             return;

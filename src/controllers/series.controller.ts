@@ -21,7 +21,6 @@ export const searchSeries = async (req: Request, res: Response): Promise<void> =
         const query = req.query.query as string;
         const pagina = Number(req.query.page) || 1;
 
-        // Validación: Si el usuario no mandó qué buscar, devolvemos un error 400 (Bad Request)
         if (!query) {
             res.status(400).json({ success: false, message: 'Falta el parámetro de búsqueda (query)' });
             return; 
@@ -38,7 +37,6 @@ export const searchSeries = async (req: Request, res: Response): Promise<void> =
 // 3. Controlador para Detalles (Lazy Loading)
 export const getDetalles = async (req: Request, res: Response) => {
     try {
-        // Leemos el ID de la URL (/api/series/1399)
         const id = Number(req.params.id);
         const serie = await obtenerDetallesSerie(id);
         
