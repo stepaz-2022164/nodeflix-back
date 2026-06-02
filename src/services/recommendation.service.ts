@@ -31,13 +31,28 @@ export const obtenerRecomendaciones = async (idUsuario: string) => {
         
         const resultado = await session.run(query, { idUsuario });
 
-        const recomendaciones = resultado.records.map(record => ({
-            id_tmdb: record.get('id_tmdb').toNumber(),
-            titulo: record.get('titulo'),
-            poster: record.get('poster'),
-            youtube_key: record.get('youtube_key'),
-            score: record.get('scoreTotal').toNumber()
-        }));
+        const recomendaciones = resultado.records.map(record => {
+            // 1. Extraemos los valores crudos
+            const idCrudo = record.get('id_tmdb');
+            const scoreCrudo = record.get('scoreTotal');
+
+            // 2. Evaluamos si son objetos de Neo4j o números normales de JS
+            const idSeguro = (idCrudo && typeof idCrudo.toNumber === 'function') 
+                             ? idCrudo.toNumber() 
+                             : Number(idCrudo);
+
+            const scoreSeguro = (scoreCrudo && typeof scoreCrudo.toNumber === 'function') 
+                             ? scoreCrudo.toNumber() 
+                             : Number(scoreCrudo);
+
+            return {
+                id_tmdb: idSeguro,
+                titulo: record.get('titulo'),
+                poster: record.get('poster'),
+                youtube_key: record.get('youtube_key'),
+                score: scoreSeguro
+            };
+        });
 
         if (recomendaciones.length === 0) {
             console.log(`Usuario ${idUsuario} sin historial suficiente. Retornando populares de TMDB.`);
