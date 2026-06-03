@@ -4,6 +4,10 @@
 
 const TMDB_BASE_URL = 'https://api.themoviedb.org/3';
 
+// 🌟 NUEVO: Póster por defecto para cuando TMDB no tenga imágenes
+// Genera una imagen oscura con letras rojas que dice "NODEFLIX"
+const POSTER_COMODIN = 'https://placehold.co/500x750/111111/EF4444?text=NODEFLIX';
+
 /**
  * Función auxiliar para no repetir la validación de la API Key
  * y el idioma en cada petición.
@@ -17,12 +21,15 @@ const armarUrl = (endpoint: string, parametrosExtra: string = '') => {
 };
 
 // ---------------------------------------------------------
-// 1. OBTENER SERIES POPULARES (Para la pantalla de inicio)
+// 1. OBTENER SERIES POPULARES (Filtro Anti-Basura)
 // ---------------------------------------------------------
 export const obtenerSeriesPopulares = async (pagina: number = 1) => {
-    const url = armarUrl('/tv/popular', `&page=${pagina}`);
-    const respuesta = await fetch(url);
+    // Usamos /discover/tv en lugar de /tv/popular
+    // Exigimos +250 votos y bloqueamos géneros: 10767 (Talk), 10764 (Reality), 10763 (News), 99 (Documentary)
+    const filtros = `&page=${pagina}&sort_by=popularity.desc&vote_count.gte=250&without_genres=10767,10764,10763,99`;
+    const url = armarUrl('/discover/tv', filtros);
     
+    const respuesta = await fetch(url);
     if (!respuesta.ok) throw new Error('Error al obtener populares de TMDB');
     
     const datos = await respuesta.json();
@@ -30,13 +37,13 @@ export const obtenerSeriesPopulares = async (pagina: number = 1) => {
     return datos.results.map((serie: any) => ({
         id_tmdb: serie.id,
         titulo: serie.name,
-        poster: serie.poster_path ? `https://image.tmdb.org/t/p/w500${serie.poster_path}` : null,
+        poster: serie.poster_path ? `https://image.tmdb.org/t/p/w500${serie.poster_path}` : POSTER_COMODIN,
         descripcion: serie.overview
     }));
 };
 
 // ---------------------------------------------------------
-// 2. BUSCAR SERIES POR NOMBRE (Para la barra de búsqueda)
+// 2. BUSCAR SERIES POR NOMBRE (Filtro de Relevancia)
 // ---------------------------------------------------------
 export const buscarSeries = async (query: string, pagina: number = 1) => {
     const querySeguro = encodeURIComponent(query);
@@ -47,10 +54,13 @@ export const buscarSeries = async (query: string, pagina: number = 1) => {
     
     const datos = await respuesta.json();
     
-    return datos.results.map((serie: any) => ({
+    // Filtramos manualmente la búsqueda para quitar series con 0 votos (fragmentos/errores de TMDB)
+    const seriesValidas = datos.results.filter((serie: any) => serie.vote_count > 10);
+    
+    return seriesValidas.map((serie: any) => ({
         id_tmdb: serie.id,
         titulo: serie.name,
-        poster: serie.poster_path ? `https://image.tmdb.org/t/p/w500${serie.poster_path}` : null,
+        poster: serie.poster_path ? `https://image.tmdb.org/t/p/w500${serie.poster_path}` : POSTER_COMODIN,
         fecha_salida: serie.first_air_date
     }));
 };
@@ -98,7 +108,8 @@ export const obtenerDetallesSerie = async (idTmdb: number) => {
         descripcion: detalles.overview,
         calificacion: detalles.vote_average,
         fecha_salida: detalles.first_air_date,
-        poster: detalles.poster_path ? `https://image.tmdb.org/t/p/w500${detalles.poster_path}` : null,
+        // 🌟 APLICAMOS EL COMODÍN AQUÍ
+        poster: detalles.poster_path ? `https://image.tmdb.org/t/p/w500${detalles.poster_path}` : POSTER_COMODIN,
         youtube_key: videoSeleccionado ? videoSeleccionado.key : null,
         generos: detalles.genres,
         plataformas: plataformas 
