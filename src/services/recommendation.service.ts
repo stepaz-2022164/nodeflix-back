@@ -1,120 +1,88 @@
 import { driver, DATABASE_NAME } from '../config/neo4j.ts';
 import { obtenerSeriesPopulares } from './tmdb.service.ts';
 
-/**
- * RANDOM WALK SOBRE EL GRAFO DE GÉNEROS
- *
- * Algoritmo en 3 saltos:
- *   Semilla (serie interactuada)
- *     → Primer salto: géneros de la semilla   (peso * rand())
- *     → Segundo salto: candidatos de esos géneros
- *     → Boost: filtrado colaborativo (usuarios similares)
- *
- * El uso de rand() en los pesos garantiza que cada llamada
- * explore caminos diferentes del grafo, produciendo resultados
- * variados sin perder la relevancia para el usuario.
- */
 export const obtenerRecomendaciones = async (idUsuario: string) => {
-  const session = driver.session({ database: DATABASE_NAME });
+    const session = driver.session({ database: DATABASE_NAME });
+    
+    try {
+        const query = `
+            // 1. RANDOM WALK CORE
+              MATCH (u:Usuario {id: $idUsuario})-[r:LE_GUSTA|ES_FAVORITA|QUIERE_VER]->(sVisto:Serie)-[:PERTENECE_A]->(g:Genero)<-[:PERTENECE_A]-(candidata:Serie)
+              WHERE NOT (u)-[]->(candidata)
 
-  try {
-    const query = `
-      // ================================================================
-      // PASO 1: SEMILLAS — series con interacción positiva del usuario
-      // ES_FAVORITA pesa 3x más que LE_GUSTA en el walk
-      // ================================================================
-      MATCH (u:Usuario {id: $idUsuario})-[r:LE_GUSTA|ES_FAVORITA]->(semilla:Serie)
-      WITH u, semilla,
-           CASE type(r) WHEN 'ES_FAVORITA' THEN 3.0 ELSE 1.0 END AS pesoInteraccion
+              WITH u, candidata, g,
+                  CASE type(r) 
+                      WHEN 'ES_FAVORITA' THEN 3.0 
+                      WHEN 'LE_GUSTA' THEN 2.0 
+                      WHEN 'QUIERE_VER' THEN 1.0
+                      ELSE 0.5 
+                  END AS pesoFuerza
 
-      // ================================================================
-      // PASO 2: PRIMER SALTO — de series a géneros
-      // rand() introduce aleatoriedad: cada género recibe un peso
-      // distinto en cada llamada, creando caminos de exploración únicos
-      // ================================================================
-      MATCH (semilla)-[:PERTENECE_A]->(genero:Genero)
-      WITH u, genero,
-           sum(pesoInteraccion) * (0.3 + rand() * 1.4) AS pesoWalk
+              // 🌟 CORRECCIÓN 1: Logaritmo en Contenido
+              // Si la suma es 100, el log10 lo reduce a 2. Si es 1000, lo reduce a 3. 
+              // Multiplicamos por 5.0 para escalar el peso, manteniendo la relevancia de la Serendipia intacta.
+              WITH u, candidata, log10(sum(pesoFuerza) + 1.0) * 5.0 AS scoreContenido
 
-      // Solo exploramos los géneros con mayor peso en este walk
-      // El subconjunto varía entre llamadas gracias al rand()
-      ORDER BY pesoWalk DESC
-      LIMIT 8
+              // 2. AGREGADO COLABORATIVO
+              OPTIONAL MATCH (u)-[:LE_GUSTA|ES_FAVORITA]->(:Serie)<-[:LE_GUSTA|ES_FAVORITA]-(vecino:Usuario)-[:LE_GUSTA|ES_FAVORITA]->(candidata)
+              WITH candidata, scoreContenido, count(DISTINCT vecino) AS vecinosComunes
 
-      // ================================================================
-      // PASO 3: SEGUNDO SALTO — de géneros a candidatos no vistos
-      // Un candidato alcanzable desde múltiples géneros acumula más peso
-      // ================================================================
-      MATCH (genero)<-[:PERTENECE_A]-(candidato:Serie)
-      WHERE NOT (u)-[]->(candidato)
+              // 🌟 CORRECCIÓN 2: Logaritmo en Viralidad
+              // Evitamos que una serie masiva con 10,000 likes aplaste a todas las demás
+              WITH candidata, scoreContenido, log10(vecinosComunes + 1.0) * 4.0 AS scoreColaborativo
 
-      WITH u, candidato,
-           sum(pesoWalk) AS scoreContenido
+              // 3. INYECCIÓN DE SERENDIPIA
+              WITH candidata, scoreContenido, scoreColaborativo, (rand() * 5.0) AS factorSerendipia
 
-      WHERE scoreContenido >= 0.3
+              // 4. ECUACIÓN FINAL ESTABILIZADA
+              WITH candidata, scoreContenido, scoreColaborativo, factorSerendipia,
+                  (scoreContenido * 1.5) + (scoreColaborativo * 1.2) + factorSerendipia AS scoreTotal
 
-      // ================================================================
-      // PASO 4: BOOST COLABORATIVO
-      // Usuarios con gustos similares que también interactuaron con el
-      // candidato aumentan su score (con ruido aleatorio incorporado)
-      // ================================================================
-      OPTIONAL MATCH (u)-[:LE_GUSTA|ES_FAVORITA]->(:Serie)
-            <-[:LE_GUSTA|ES_FAVORITA]-(par:Usuario)
-            -[:LE_GUSTA|ES_FAVORITA]->(candidato)
-      WITH candidato,
-           scoreContenido,
-           count(DISTINCT par) AS pares
+              WHERE scoreTotal > 2.0
+              ORDER BY scoreTotal DESC
+              LIMIT 20
 
-      // Score final: contenido del walk + boost social + ruido
-      WITH candidato,
-           (scoreContenido + pares * 4.0) * (0.8 + rand() * 0.4) AS scoreTotal
+              RETURN candidata.id_tmdb AS id_tmdb, 
+                    candidata.titulo AS titulo, 
+                    candidata.poster AS poster, 
+                    candidata.youtube_key AS youtube_key, 
+                    scoreTotal
+        `;
+        
+        const resultado = await session.run(query, { idUsuario });
 
-      ORDER BY scoreTotal DESC
-      LIMIT 20
+        // Mapeo a prueba de balas para Neo4j (Previene los errores 500)
+        const recomendaciones = resultado.records.map(record => {
+            const idCrudo = record.get('id_tmdb');
+            const scoreCrudo = record.get('scoreTotal');
 
-      RETURN candidato.id_tmdb  AS id_tmdb,
-             candidato.titulo   AS titulo,
-             candidato.poster   AS poster,
-             candidato.youtube_key AS youtube_key,
-             scoreTotal
-    `;
+            const idSeguro = (idCrudo && typeof idCrudo.toNumber === 'function') 
+                             ? idCrudo.toNumber() 
+                             : Number(idCrudo);
 
-    const resultado = await session.run(query, { idUsuario });
+            const scoreSeguro = (scoreCrudo && typeof scoreCrudo.toNumber === 'function') 
+                             ? scoreCrudo.toNumber() 
+                             : Number(scoreCrudo);
 
-    const recomendaciones = resultado.records.map(record => {
-      const idCrudo    = record.get('id_tmdb');
-      const scoreCrudo = record.get('scoreTotal');
+            return {
+                id_tmdb: idSeguro,
+                titulo: record.get('titulo'),
+                poster: record.get('poster'),
+                youtube_key: record.get('youtube_key'),
+                score: scoreSeguro
+            };
+        });
 
-      const idSeguro = (idCrudo && typeof idCrudo.toNumber === 'function')
-        ? idCrudo.toNumber()
-        : Number(idCrudo);
+        // Fallback dinámico en caso de que el usuario tenga un grafo completamente aislado o vacío
+        if (recomendaciones.length === 0) {
+            console.log(`Usuario ${idUsuario} sin historial suficiente. Inyectando populares aleatorias.`);
+            const randomPage = Math.floor(Math.random() * 4) + 1; // Páginas 1-4 de tendencias globales
+            return await obtenerSeriesPopulares(randomPage); 
+        }
 
-      const scoreSeguro = (scoreCrudo && typeof scoreCrudo.toNumber === 'function')
-        ? scoreCrudo.toNumber()
-        : Number(scoreCrudo);
+        return recomendaciones;
 
-      return {
-        id_tmdb:     idSeguro,
-        titulo:      record.get('titulo'),
-        poster:      record.get('poster'),
-        youtube_key: record.get('youtube_key'),
-        score:       scoreSeguro
-      };
-    });
-
-    if (recomendaciones.length === 0) {
-      console.log(
-        `Usuario ${idUsuario} sin historial suficiente. ` +
-        `Retornando populares de TMDB (página aleatoria).`
-      );
-      // Página aleatoria 1-4 para que el fallback tampoco sea siempre igual
-      const paginaAleatoria = 1 + Math.floor(Math.random() * 4);
-      return await obtenerSeriesPopulares(paginaAleatoria);
+    } finally {
+        await session.close();
     }
-
-    return recomendaciones;
-
-  } finally {
-    await session.close();
-  }
 };

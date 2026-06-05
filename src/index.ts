@@ -9,6 +9,9 @@ import recommendationRoutes from './routes/recommendation.routes.ts';
 
 const app = express();
 const PORT = process.env.PORT || 3000;
+app.listen(PORT, () => {
+    console.log(`Servidor corriendo en el puerto ${PORT}`);
+});
 
 // Middlewares
 app.use(cors({
