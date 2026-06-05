@@ -14,11 +14,16 @@ app.listen(PORT, () => {
 });
 
 // Middlewares
-app.use(cors({
-    origin: 'http://localhost:4200',
-    methods: ['GET', 'POST', 'PUT', 'DELETE'],
-    allowedHeaders: ['Content-Type', 'Authorization'] 
-}));
+const corsOptions = {
+  origin: [
+    'http://localhost:4200',
+    'http://localhost:63657',
+    'https://nodeflix-frontend.vercel.app' 
+  ],
+  credentials: true,
+  optionsSuccessStatus: 200
+};
+app.use(cors(corsOptions));
 app.use(express.json());
 
 // Rutas
