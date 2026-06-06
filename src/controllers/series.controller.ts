@@ -1,10 +1,8 @@
 import { type Request, type Response } from 'express';
 import { obtenerSeriesPopulares, buscarSeries, obtenerDetallesSerie } from '../services/tmdb.service.ts';
 
-// 1. Controlador para Populares
 export const getPopulares = async (req: Request, res: Response) => {
     try {
-        // Leemos la página de la URL (?page=2). Si no viene, usamos la 1.
         const pagina = Number(req.query.page) || 1; 
         const series = await obtenerSeriesPopulares(pagina);
         
@@ -15,7 +13,6 @@ export const getPopulares = async (req: Request, res: Response) => {
     }
 };
 
-// 2. Controlador para Búsqueda
 export const searchSeries = async (req: Request, res: Response): Promise<void> => {
     try {
         const query = req.query.query as string;
@@ -34,7 +31,6 @@ export const searchSeries = async (req: Request, res: Response): Promise<void> =
     }
 };
 
-// 3. Controlador para Detalles (Lazy Loading)
 export const getDetalles = async (req: Request, res: Response) => {
     try {
         const id = Number(req.params.id);

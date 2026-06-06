@@ -18,17 +18,12 @@ export const obtenerRecomendaciones = async (idUsuario: string) => {
                       ELSE 0.5 
                   END AS pesoFuerza
 
-              // 🌟 CORRECCIÓN 1: Logaritmo en Contenido
               // Si la suma es 100, el log10 lo reduce a 2. Si es 1000, lo reduce a 3. 
-              // Multiplicamos por 5.0 para escalar el peso, manteniendo la relevancia de la Serendipia intacta.
               WITH u, candidata, log10(sum(pesoFuerza) + 1.0) * 5.0 AS scoreContenido
 
               // 2. AGREGADO COLABORATIVO
               OPTIONAL MATCH (u)-[:LE_GUSTA|ES_FAVORITA]->(:Serie)<-[:LE_GUSTA|ES_FAVORITA]-(vecino:Usuario)-[:LE_GUSTA|ES_FAVORITA]->(candidata)
               WITH candidata, scoreContenido, count(DISTINCT vecino) AS vecinosComunes
-
-              // 🌟 CORRECCIÓN 2: Logaritmo en Viralidad
-              // Evitamos que una serie masiva con 10,000 likes aplaste a todas las demás
               WITH candidata, scoreContenido, log10(vecinosComunes + 1.0) * 4.0 AS scoreColaborativo
 
               // 3. INYECCIÓN DE SERENDIPIA
@@ -51,7 +46,6 @@ export const obtenerRecomendaciones = async (idUsuario: string) => {
         
         const resultado = await session.run(query, { idUsuario });
 
-        // Mapeo a prueba de balas para Neo4j (Previene los errores 500)
         const recomendaciones = resultado.records.map(record => {
             const idCrudo = record.get('id_tmdb');
             const scoreCrudo = record.get('scoreTotal');
@@ -73,10 +67,9 @@ export const obtenerRecomendaciones = async (idUsuario: string) => {
             };
         });
 
-        // Fallback dinámico en caso de que el usuario tenga un grafo completamente aislado o vacío
         if (recomendaciones.length === 0) {
             console.log(`Usuario ${idUsuario} sin historial suficiente. Inyectando populares aleatorias.`);
-            const randomPage = Math.floor(Math.random() * 4) + 1; // Páginas 1-4 de tendencias globales
+            const randomPage = Math.floor(Math.random() * 4) + 1;
             return await obtenerSeriesPopulares(randomPage); 
         }
 

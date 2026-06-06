@@ -1,17 +1,6 @@
-// ==========================================
-// SERVICIO DE TMDB (Lectura de Datos)
-// ==========================================
-
 const TMDB_BASE_URL = 'https://api.themoviedb.org/3';
-
-// 🌟 NUEVO: Póster por defecto para cuando TMDB no tenga imágenes
-// Genera una imagen oscura con letras rojas que dice "NODEFLIX"
 const POSTER_COMODIN = 'https://placehold.co/500x750/111111/EF4444?text=NODEFLIX';
 
-/**
- * Función auxiliar para no repetir la validación de la API Key
- * y el idioma en cada petición.
- */
 const armarUrl = (endpoint: string, parametrosExtra: string = '') => {
     const apiKey = process.env.TMDB_API_KEY;
     if (!apiKey) {
@@ -20,12 +9,7 @@ const armarUrl = (endpoint: string, parametrosExtra: string = '') => {
     return `${TMDB_BASE_URL}${endpoint}?api_key=${apiKey}&language=es-MX${parametrosExtra}`;
 };
 
-// ---------------------------------------------------------
-// 1. OBTENER SERIES POPULARES (Filtro Anti-Basura)
-// ---------------------------------------------------------
 export const obtenerSeriesPopulares = async (pagina: number = 1) => {
-    // Usamos /discover/tv en lugar de /tv/popular
-    // Exigimos +250 votos y bloqueamos géneros: 10767 (Talk), 10764 (Reality), 10763 (News), 99 (Documentary)
     const filtros = `&page=${pagina}&sort_by=popularity.desc&vote_count.gte=250&without_genres=10767,10764,10763,99`;
     const url = armarUrl('/discover/tv', filtros);
     
@@ -42,9 +26,6 @@ export const obtenerSeriesPopulares = async (pagina: number = 1) => {
     }));
 };
 
-// ---------------------------------------------------------
-// 2. BUSCAR SERIES POR NOMBRE (Filtro de Relevancia)
-// ---------------------------------------------------------
 export const buscarSeries = async (query: string, pagina: number = 1) => {
     const querySeguro = encodeURIComponent(query);
     const url = armarUrl('/search/tv', `&query=${querySeguro}&page=${pagina}`);
@@ -65,9 +46,6 @@ export const buscarSeries = async (query: string, pagina: number = 1) => {
     }));
 };
 
-// ---------------------------------------------------------
-// 3. OBTENER DETALLES Y TRÁILER (Para Lazy Loading y Neo4j)
-// ---------------------------------------------------------
 export const obtenerDetallesSerie = async (idTmdb: number) => {
     const urlDetalles = armarUrl(`/tv/${idTmdb}`);
     const urlVideos = armarUrl(`/tv/${idTmdb}/videos`, '&include_video_language=es-MX,es,en');

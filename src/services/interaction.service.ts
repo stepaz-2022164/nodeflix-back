@@ -36,8 +36,6 @@ export const registrarInteraccion = async (idUsuario: string, idTmdb: number, ti
             });
         }
 
-        // 🌟 NUEVA LÓGICA MULTI-INTERACCIÓN Y TOGGLE
-        // 1. Verificamos si EXACTAMENTE esta interacción ya existe
         const checkRelQuery = `
             MATCH (u:Usuario {id: $idUsuario})-[r:${tipoInteraccion}]->(s:Serie {id_tmdb: $idTmdb})
             RETURN r
@@ -45,15 +43,12 @@ export const registrarInteraccion = async (idUsuario: string, idTmdb: number, ti
         const relResult = await session.run(checkRelQuery, { idUsuario, idTmdb });
 
         if (relResult.records.length > 0) {
-            // Si el usuario vuelve a presionar el botón encendido, lo "apagamos" (Toggle Off)
             await session.run(
                 `MATCH (u:Usuario {id: $idUsuario})-[r:${tipoInteraccion}]->(s:Serie {id_tmdb: $idTmdb}) DELETE r`,
                 { idUsuario, idTmdb }
             );
             return { usuario: idUsuario, accion: 'REMOVIDA', serie: idTmdb };
         } else {
-            // Si no existe, la creamos (Toggle On)
-            // Regla: Si marcó NO_LE_GUSTA, borramos las positivas. Si es positiva, borramos NO_LE_GUSTA.
             if (tipoInteraccion === 'NO_LE_GUSTA') {
                 await session.run(
                     `MATCH (u:Usuario {id: $idUsuario})-[r:LE_GUSTA|ES_FAVORITA|QUIERE_VER]->(s:Serie {id_tmdb: $idTmdb}) DELETE r`,
@@ -93,10 +88,8 @@ export const obtenerInteraccionesUsuario = async (idUsuario: string) => {
         const resultado = await session.run(query, { idUsuario });
         
         return resultado.records.map(record => {
-            // 1. Extraemos el valor crudo del ID
             const idCrudo = record.get('id_tmdb');
             
-            // 2. Aplicamos la evaluación segura
             const idSeguro = (idCrudo && typeof idCrudo.toNumber === 'function') 
                              ? idCrudo.toNumber() 
                              : Number(idCrudo);

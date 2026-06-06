@@ -25,7 +25,6 @@ export const login = async (req: Request, res: Response): Promise<void> => {
         const usuario = await loginUsuario(req.body.correo, req.body.password);
         res.status(200).json({ success: true, data: usuario });
     } catch (error: any) {
-        // Usamos status 401 (Unauthorized) para credenciales inválidas
         res.status(401).json({ success: false, message: error.message });
     }
 };
